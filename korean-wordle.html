@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>자모 단어 맞추기</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:#111;color:#fff;font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;overscroll-behavior:none}
+#app{display:flex;flex-direction:column;align-items:center;height:100dvh;max-width:480px;margin:0 auto;padding:0 10px}
+#header{width:100%;display:flex;align-items:center;justify-content:center;padding:10px 0 8px;border-bottom:1px solid #333;margin-bottom:8px;position:relative;flex-shrink:0}
+#header span{font-size:17px;font-weight:600;letter-spacing:1px}
+.hbtn{position:absolute;background:none;border:none;color:#aaa;font-size:20px;cursor:pointer;padding:4px 8px}
+#btn-info{right:0}
+#btn-stat{left:0}
+#status{font-size:13px;color:#aaa;margin-bottom:6px;min-height:18px;text-align:center;flex-shrink:0}
+#grid{display:flex;flex-direction:column;gap:4px;padding:4px 0;flex-shrink:0}
+.row{display:flex;gap:4px;justify-content:center}
+.cell{width:52px;height:52px;border:2px solid #3a3a3c;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:600;border-radius:4px;color:#fff;transition:background .25s,border-color .25s}
+.cell.filled{border-color:#565758}
+.cell.correct{background:#538d4e;border-color:#538d4e}
+.cell.present{background:#b59f3b;border-color:#b59f3b}
+.cell.absent{background:#3a3a3c;border-color:#3a3a3c}
+#next-btn{display:none;padding:10px 32px;background:#538d4e;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;margin:6px 0;font-family:inherit;flex-shrink:0}
+#keyboard{width:100%;padding:6px 0 10px;flex-shrink:0}
+.kb-row{display:flex;gap:4px;justify-content:center;margin-bottom:4px}
+.key{height:44px;flex:1;max-width:40px;border-radius:5px;border:none;background:#818384;color:#fff;font-size:15px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit;user-select:none;touch-action:manipulation;position:relative}
+.key:active{opacity:.7;transform:scale(.95)}
+.key.action{max-width:54px;font-size:12px;font-weight:600;background:#3a3a3c;flex:1.4}
+.key.correct{background:#538d4e}
+.key.present{background:#b59f3b}
+.key.absent{background:#3a3a3c}
+/* 팝업 공통 */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:100;align-items:center;justify-content:center}
+.overlay.show{display:flex}
+.popup{background:#1a1a1b;border:1px solid #333;border-radius:14px;padding:22px;max-width:310px;width:92%}
+.popup h2{font-size:16px;font-weight:600;margin-bottom:14px;text-align:center}
+.popup-close{width:100%;padding:10px;background:#333;color:#fff;border:none;border-radius:6px;font-size:14px;cursor:pointer;margin-top:14px;font-family:inherit}
+/* 힌트 설명 */
+.legend{display:flex;gap:10px;align-items:center;margin:5px 0;font-size:13px;color:#ccc}
+.lb{width:26px;height:26px;border-radius:3px;flex-shrink:0}
+.lb.correct{background:#538d4e}.lb.present{background:#b59f3b}.lb.absent{background:#3a3a3c}
+/* 통계 */
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
+.stat-box{text-align:center;background:#222;border-radius:8px;padding:8px 4px}
+.stat-num{font-size:22px;font-weight:600}
+.stat-lbl{font-size:10px;color:#aaa;margin-top:2px}
+.bar-row{display:flex;align-items:center;gap:6px;margin:3px 0;font-size:12px}
+.bar-label{width:14px;text-align:right;color:#aaa}
+.bar-bg{flex:1;background:#3a3a3c;border-radius:3px;height:20px;overflow:hidden}
+.bar-fill{background:#538d4e;height:100%;border-radius:3px;display:flex;align-items:center;justify-content:flex-end;padding-right:6px;font-size:11px;font-weight:600;min-width:24px;transition:width .4s}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="header">
+    <button class="hbtn" id="btn-stat" onclick="showStat()">📊</button>
+    <span>자모 단어 맞추기</span>
+    <button class="hbtn" id="btn-info" onclick="showInfo()">ⓘ</button>
+  </div>
+  <div id="status"></div>
+  <div id="grid"></div>
+  <button id="next-btn" onclick="nextPuzzle()">다음 문제 →</button>
+  <div id="keyboard"></div>
+</div>
+
+<!-- 도움말 -->
+<div class="overlay" id="info-overlay" onclick="this.classList.remove('show')">
+  <div class="popup" onclick="event.stopPropagation()">
+    <h2>게임 방법</h2>
+    <p style="font-size:13px;color:#aaa;line-height:1.7;margin-bottom:10px">
+      단어를 자모로 분해하면 5개가 되는 단어를 맞추세요.<br>
+      이중모음 → 단모음 2개 (ㅐ=ㅏ+ㅣ, ㅢ=ㅡ+ㅣ)<br>
+      쌍자음 → 단자음 2개 (ㄲ=ㄱ+ㄱ)<br><br>
+      예) 도전 → ㄷ ㅗ ㅈ ㅓ ㄴ<br>
+      예) 배려 → ㅂ ㅏ ㅣ ㄹ ㅕ
+    </p>
+    <div class="legend"><div class="lb correct"></div>정답 위치에 정답 자모</div>
+    <div class="legend"><div class="lb present"></div>단어에 있지만 위치 다름</div>
+    <div class="legend"><div class="lb absent"></div>단어에 없는 자모</div>
+    <button class="popup-close" onclick="document.getElementById('info-overlay').classList.remove('show')">닫기</button>
+  </div>
+</div>
+
+<!-- 통계 -->
+<div class="overlay" id="stat-overlay" onclick="this.classList.remove('show')">
+  <div class="popup" onclick="event.stopPropagation()">
+    <h2>내 통계</h2>
+    <div class="stat-grid">
+      <div class="stat-box"><div class="stat-num" id="s-played">0</div><div class="stat-lbl">게임 수</div></div>
+      <div class="stat-box"><div class="stat-num" id="s-win">0%</div><div class="stat-lbl">승률</div></div>
+      <div class="stat-box"><div class="stat-num" id="s-streak">0</div><div class="stat-lbl">연속정답</div></div>
+      <div class="stat-box"><div class="stat-num" id="s-avg">-</div><div class="stat-lbl">평균시도</div></div>
+    </div>
+    <p style="font-size:12px;color:#aaa;margin-bottom:6px">시도 횟수 분포</p>
+    <div id="dist-bars"></div>
+    <button class="popup-close" onclick="document.getElementById('stat-overlay').classList.remove('show')">닫기</button>
+  </div>
+</div>
+
+<script>
+const WORDS = ["가난", "가능", "가담", "가득", "가량", "가련", "가름", "가면", "가문", "가변", "가볍", "가분", "가산", "가선", "가설", "가성", "가속", "가식", "가신", "가열", "가용", "가운", "가을", "가입", "가장", "가전", "가정", "가족", "가중", "가진", "가창", "간부", "간수", "간이", "감사", "감소", "감수", "감시", "강도", "강수", "강조", "개시", "개요", "거듭", "거목", "거울", "거인", "거점", "거품", "건조", "결부", "결코", "경고", "경기", "경로", "경비", "고난", "고독", "고민", "고집", "고통", "고향", "공기", "공리", "공모", "공부", "공사", "공지", "공포", "과거", "과부", "교감", "교과", "교육", "교인", "교장", "교훈", "구분", "구별", "구성", "구속", "구역", "구인", "구절", "구체", "국어", "국토", "규범", "규율", "규정", "규칙", "근거", "기간", "기념", "기능", "기록", "기름", "기반", "기본", "기분", "기술", "기억", "기업", "기준", "기침", "깊이", "나눔", "나름", "나선", "나열", "낭비", "노력", "노선", "노인", "논리", "높이", "누적", "다양", "단어", "당시", "대가", "대기", "대비", "도달", "도덕", "도움", "도전", "독서", "동기", "동료", "동시", "두각", "마음", "매우", "면모", "모순", "모험", "목표", "무력", "무한", "미덕", "미래", "배려", "보람", "보편", "복지", "봉사", "부담", "부족", "분리", "비판", "사랑", "사명", "사실", "사회", "소망", "소신", "소통", "수련", "수양", "순수", "승리", "아름", "용기", "우정", "유연", "의미", "의지", "이해", "자립", "자신", "조화", "지혜", "진리", "포용", "가위", "겨울", "구의", "노래", "모의", "배우", "수의", "의사", "주의", "까치", "꼬리", "조끼", "토끼", "각오", "겨냥", "계기", "기개", "다짐", "단호", "도약", "득도", "부단", "비움", "사심", "소명", "예지", "우직", "유덕", "자각", "자성", "조심", "지덕", "진보", "초연", "흠모", "가곡", "가공", "가극", "가금", "가납", "가늘", "가늠", "가닥", "가뭄", "가방", "가습", "가압", "가옥", "가인", "가죽", "가증", "각자", "간고", "간도", "감미", "강기", "개구", "개미", "개소", "거금", "거대", "거래", "거만", "거물", "건투", "격노", "격려", "격조", "격차", "견고", "견지", "결기", "겸비", "경시", "고각", "고견", "고결", "고귀", "고달", "고문", "고식", "고심", "고열", "고위", "고전", "공무", "공효", "과도", "과로", "교량", "교만", "교역", "교의", "구동", "구심", "구제", "극기", "근기", "금도", "긍지", "기강", "기골", "기력", "기민", "기상", "기성", "기세", "기풍", "나심", "낭도", "노숙", "노장", "노정", "논거", "능가", "다각", "다감", "다독", "다방", "다복", "다심", "단비", "당도", "대도", "도량", "도심", "독기", "독보", "독자", "독주", "돌파", "만수", "매사", "모범", "무난", "무능", "무덕", "무명", "무상", "무심", "무욕", "무위", "묵도", "미련", "미몽", "방비", "부강", "부덕", "부동", "분기", "비결", "비굴", "비범", "비상", "사필", "상도", "선도", "선비", "소박", "시련", "심사", "심오", "안주", "야망", "양보", "역도", "연구", "열기", "영리", "예리", "외유", "용서", "유능", "유망", "유익", "의기", "의리", "이성", "인자", "일치", "자강", "자결", "자긍", "자단", "자득", "자력", "자발", "자애", "자율", "자존", "자중", "정교", "정도", "지극", "지력", "진기", "차분", "창조", "철두", "철저", "특유", "풍부", "합리", "호연", "가슴", "그림", "기회", "대지", "만고", "보전", "지성", "지식"];
+
+// 자모 분해 테이블
+const CHO=['ㄱ','ㄲ','ㄴ','ㄷ','ㄸ','ㄹ','ㅁ','ㅂ','ㅃ','ㅅ','ㅆ','ㅇ','ㅈ','ㅉ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'];
+const JUNG=['ㅏ','ㅐ','ㅑ','ㅒ','ㅓ','ㅔ','ㅕ','ㅖ','ㅗ','ㅘ','ㅙ','ㅚ','ㅛ','ㅜ','ㅝ','ㅞ','ㅟ','ㅠ','ㅡ','ㅢ','ㅣ'];
+const JONG=['','ㄱ','ㄲ','ㄳ','ㄴ','ㄵ','ㄶ','ㄷ','ㄹ','ㄺ','ㄻ','ㄼ','ㄽ','ㄾ','ㄿ','ㅀ','ㅁ','ㅂ','ㅄ','ㅅ','ㅆ','ㅇ','ㅈ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'];
+const VEXP={'ㅐ':['ㅏ','ㅣ'],'ㅒ':['ㅑ','ㅣ'],'ㅔ':['ㅓ','ㅣ'],'ㅖ':['ㅕ','ㅣ'],'ㅘ':['ㅗ','ㅏ'],'ㅙ':['ㅗ','ㅏ','ㅣ'],'ㅚ':['ㅗ','ㅣ'],'ㅝ':['ㅜ','ㅓ'],'ㅞ':['ㅜ','ㅓ','ㅣ'],'ㅟ':['ㅜ','ㅣ'],'ㅢ':['ㅡ','ㅣ']};
+const CEXP={'ㄲ':['ㄱ','ㄱ'],'ㄸ':['ㄷ','ㄷ'],'ㅃ':['ㅂ','ㅂ'],'ㅆ':['ㅅ','ㅅ'],'ㅉ':['ㅈ','ㅈ']};
+const JEXP={'ㄳ':['ㄱ','ㅅ'],'ㄵ':['ㄴ','ㅈ'],'ㄶ':['ㄴ','ㅎ'],'ㄺ':['ㄹ','ㄱ'],'ㄻ':['ㄹ','ㅁ'],'ㄼ':['ㄹ','ㅂ'],'ㄽ':['ㄹ','ㅅ'],'ㄾ':['ㄹ','ㅌ'],'ㄿ':['ㄹ','ㅍ'],'ㅀ':['ㄹ','ㅎ'],'ㅄ':['ㅂ','ㅅ']};
+
+function wordToJamo(word){
+  let r=[];
+  for(const ch of word){
+    const code=ch.charCodeAt(0)-0xAC00;
+    if(code<0||code>11171){r.push(ch);continue;}
+    const cho=CHO[Math.floor(code/28/21)];
+    const jung=JUNG[Math.floor(code/28)%21];
+    const jong=JONG[code%28];
+    r.push(...(CEXP[cho]||[cho]));
+    r.push(...(VEXP[jung]||[jung]));
+    if(jong) r.push(...(JEXP[jong]||[jong]));
+  }
+  return r;
+}
+
+// 두벌식 키보드 (ㅐ,ㅔ 제거)
+const KB_ROWS=[
+  [{l:'ㅂ',v:'ㅂ',q:'Q'},{l:'ㅈ',v:'ㅈ',q:'W'},{l:'ㄷ',v:'ㄷ',q:'E'},{l:'ㄱ',v:'ㄱ',q:'R'},{l:'ㅅ',v:'ㅅ',q:'T'},{l:'ㅛ',v:'ㅛ',q:'Y'},{l:'ㅕ',v:'ㅕ',q:'U'},{l:'ㅑ',v:'ㅑ',q:'I'}],
+  [{l:'ㅁ',v:'ㅁ',q:'A'},{l:'ㄴ',v:'ㄴ',q:'S'},{l:'ㅇ',v:'ㅇ',q:'D'},{l:'ㄹ',v:'ㄹ',q:'F'},{l:'ㅎ',v:'ㅎ',q:'G'},{l:'ㅗ',v:'ㅗ',q:'H'},{l:'ㅓ',v:'ㅓ',q:'J'},{l:'ㅏ',v:'ㅏ',q:'K'},{l:'ㅣ',v:'ㅣ',q:'L'}],
+  [{l:'ㅋ',v:'ㅋ',q:'Z'},{l:'ㅌ',v:'ㅌ',q:'X'},{l:'ㅊ',v:'ㅊ',q:'C'},{l:'ㅍ',v:'ㅍ',q:'V'},{l:'ㅠ',v:'ㅠ',q:'B'},{l:'ㅜ',v:'ㅜ',q:'N'},{l:'ㅡ',v:'ㅡ',q:'M'}]
+];
+
+// 입력 버퍼 (자모 배열)
+const BASIC_VOWS=new Set(['ㅏ','ㅑ','ㅓ','ㅕ','ㅗ','ㅛ','ㅜ','ㅠ','ㅡ','ㅣ']);
+const BASIC_CONS=new Set(['ㄱ','ㄴ','ㄷ','ㄹ','ㅁ','ㅂ','ㅅ','ㅇ','ㅈ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ']);
+const COMB_VOWS={'ㅗㅏ':'ㅘ','ㅗㅣ':'ㅚ','ㅜㅓ':'ㅝ','ㅜㅣ':'ㅟ','ㅡㅣ':'ㅢ','ㅏㅣ':'ㅐ','ㅓㅣ':'ㅔ','ㅑㅣ':'ㅒ','ㅕㅣ':'ㅖ'};
+
+// 입력 버퍼: 자모 그대로 쌓음 (ㅐ는 ㅏ+ㅣ로)
+let buf=[], answer=[], answerWord='', guesses=[], gameOver=false, keyStates={}, usedWords=new Set();
+
+function pickWord(){
+  let pool=WORDS.filter(w=>!usedWords.has(w));
+  if(!pool.length){usedWords.clear();pool=[...WORDS];}
+  return pool[Math.floor(Math.random()*pool.length)];
+}
+
+// 통계 로드/저장
+function loadStats(){
+  try{return JSON.parse(localStorage.getItem('jamo_stats'))||{played:0,won:0,streak:0,maxStreak:0,dist:{1:0,2:0,3:0,4:0,5:0}};}
+  catch(e){return{played:0,won:0,streak:0,maxStreak:0,dist:{1:0,2:0,3:0,4:0,5:0}};}
+}
+function saveStats(s){localStorage.setItem('jamo_stats',JSON.stringify(s));}
+
+function buildGrid(){
+  const g=document.getElementById('grid');g.innerHTML='';
+  for(let r=0;r<5;r++){
+    const row=document.createElement('div');row.className='row';
+    for(let c=0;c<5;c++){
+      const cell=document.createElement('div');cell.className='cell';cell.id=`c${r}${c}`;
+      row.appendChild(cell);
+    }
+    g.appendChild(row);
+  }
+}
+
+function buildKeyboard(){
+  const kb=document.getElementById('keyboard');kb.innerHTML='';
+  KB_ROWS.forEach((rowDef,ri)=>{
+    const row=document.createElement('div');row.className='kb-row';
+    rowDef.forEach(k=>{
+      const el=document.createElement('button');
+      el.className='key';
+      el.innerHTML=`${k.l}<span style="position:absolute;top:2px;right:3px;font-size:8px;color:rgba(255,255,255,.45)">${k.q}</span>`;
+      el.dataset.val=k.v;
+      el.addEventListener('click',()=>handleInput(k.v));
+      row.appendChild(el);
+    });
+    if(ri===1){
+      const del=document.createElement('button');del.className='key action';del.textContent='←';
+      del.addEventListener('click',handleDelete);row.appendChild(del);
+    }
+    if(ri===2){
+      const ent=document.createElement('button');ent.className='key action';ent.textContent='입력';
+      ent.addEventListener('click',handleEnter);row.appendChild(ent);
+    }
+    kb.appendChild(row);
+  });
+}
+
+function updateCurrentRow(){
+  const row=guesses.length;if(row>=5)return;
+  for(let c=0;c<5;c++){
+    const cell=document.getElementById(`c${row}${c}`);
+    cell.textContent=buf[c]||'';
+    cell.className='cell'+(buf[c]?' filled':'');
+  }
+}
+
+function handleInput(jamo){
+  if(gameOver||guesses.length>=5)return;
+  if(buf.length>=5)return;
+  buf.push(jamo);
+  updateCurrentRow();
+}
+
+function handleDelete(){
+  if(gameOver)return;
+  if(buf.length>0){buf.pop();updateCurrentRow();}
+}
+
+function handleEnter(){
+  if(gameOver||guesses.length>=5)return;
+  if(buf.length!==5){setStatus('자모 5개를 입력해주세요');return;}
+  const guess=[...buf];
+  guesses.push(guess);buf=[];
+  revealRow(guesses.length-1,guess);
+}
+
+function revealRow(row,guess){
+  const result=[],ansLeft=[...answer];
+  for(let i=0;i<5;i++){
+    if(guess[i]===answer[i]){result[i]='correct';ansLeft[i]=null;}
+    else result[i]=null;
+  }
+  for(let i=0;i<5;i++){
+    if(result[i])continue;
+    const idx=ansLeft.indexOf(guess[i]);
+    if(idx>=0){result[i]='present';ansLeft[idx]=null;}
+    else result[i]='absent';
+  }
+  for(let i=0;i<5;i++){
+    const cell=document.getElementById(`c${row}${i}`);
+    cell.className='cell '+result[i];cell.textContent=guess[i];
+    const j=guess[i];
+    if(result[i]==='correct') keyStates[j]='correct';
+    else if(result[i]==='present'&&keyStates[j]!=='correct') keyStates[j]='present';
+    else if(result[i]==='absent'&&!keyStates[j]) keyStates[j]='absent';
+  }
+  updateKeyColors();
+
+  const won=guess.join('')===answer.join('');
+  if(won||guesses.length>=5){
+    gameOver=true;
+    // 통계 업데이트
+    const st=loadStats();
+    st.played++;
+    if(won){
+      st.won++;st.streak++;
+      st.maxStreak=Math.max(st.maxStreak,st.streak);
+      st.dist[guesses.length]=(st.dist[guesses.length]||0)+1;
+    } else {
+      st.streak=0;
+    }
+    saveStats(st);
+    if(won) setStatus('🎉 정답! ('+guesses.length+'번 만에)');
+    else setStatus('정답: '+answerWord);
+    document.getElementById('next-btn').style.display='block';
+  }
+}
+
+function updateKeyColors(){
+  document.querySelectorAll('.key[data-val]').forEach(k=>{
+    const s=keyStates[k.dataset.val];
+    k.className=k.className.replace(/\b(correct|present|absent)\b/g,'').trim();
+    if(s)k.classList.add(s);
+  });
+}
+
+function setStatus(msg){document.getElementById('status').textContent=msg;}
+
+function showInfo(){document.getElementById('info-overlay').classList.add('show');}
+function showStat(){
+  const st=loadStats();
+  document.getElementById('s-played').textContent=st.played;
+  document.getElementById('s-win').textContent=st.played?Math.round(st.won/st.played*100)+'%':'0%';
+  document.getElementById('s-streak').textContent=st.streak;
+  const wins=Object.values(st.dist).reduce((a,b)=>a+b,0);
+  const avgStr=wins?( Object.entries(st.dist).reduce((a,[k,v])=>a+k*v,0)/wins ).toFixed(1):'-';
+  document.getElementById('s-avg').textContent=avgStr;
+  const maxV=Math.max(1,...Object.values(st.dist));
+  const bars=document.getElementById('dist-bars');bars.innerHTML='';
+  for(let i=1;i<=5;i++){
+    const v=st.dist[i]||0;
+    const pct=Math.round(v/maxV*100);
+    bars.innerHTML+=`<div class="bar-row"><span class="bar-label">${i}</span><div class="bar-bg"><div class="bar-fill" style="width:${Math.max(pct,8)}%">${v}</div></div></div>`;
+  }
+  document.getElementById('stat-overlay').classList.add('show');
+}
+
+function nextPuzzle(){
+  usedWords.add(answerWord);
+  answerWord=pickWord();answer=wordToJamo(answerWord);
+  guesses=[];buf=[];gameOver=false;keyStates={};
+  buildGrid();buildKeyboard();setStatus('');
+  document.getElementById('next-btn').style.display='none';
+}
+
+document.addEventListener('keydown',e=>{
+  if(e.key==='Enter')handleEnter();
+  else if(e.key==='Backspace')handleDelete();
+  else{
+    const map={'q':'ㅂ','w':'ㅈ','e':'ㄷ','r':'ㄱ','t':'ㅅ','y':'ㅛ','u':'ㅕ','i':'ㅑ','a':'ㅁ','s':'ㄴ','d':'ㅇ','f':'ㄹ','g':'ㅎ','h':'ㅗ','j':'ㅓ','k':'ㅏ','l':'ㅣ','z':'ㅋ','x':'ㅌ','c':'ㅊ','v':'ㅍ','b':'ㅠ','n':'ㅜ','m':'ㅡ'};
+    const j=map[e.key.toLowerCase()];
+    if(j)handleInput(j);
+  }
+});
+
+answerWord=pickWord();answer=wordToJamo(answerWord);
+buildGrid();buildKeyboard();
+</script>
+</body>
+</html>
